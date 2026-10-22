@@ -9,6 +9,10 @@ jobs:
   quality:
     name: Python 3.11 quality checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PREFECT_HOME: ${{ runner.temp }}/prefect
+      PREFECT_SERVER_ANALYTICS_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
       - name: Install uv
@@ -22,7 +26,16 @@ jobs:
         run: uv sync --locked --python 3.11
       - name: Check code and configuration
         run: uv run --no-sync pre-commit run --all-files
-      - name: Test training and inference
-        run: uv run --no-sync python -m unittest discover -s tests
-      - name: Verify runtime dependency
-        run: uv run --no-sync python -c "from pydantic import BaseModel; print('Pydantic import OK')"
+      - name: Test modelling and orchestration
+        run: uv run --no-sync python -m unittest discover -s tests -v
+      - name: Verify runtime dependencies
+        run: |
+          uv run --no-sync python - <<'PY'
+          import mlflow
+          import prefect
+          import pydantic
+          from prefect.server.api.server import create_app
+
+          create_app(ephemeral=True)
+          print(f"Prefect {prefect.__version__}; MLflow {mlflow.__version__}; Pydantic {pydantic.__version__}")
+          PY

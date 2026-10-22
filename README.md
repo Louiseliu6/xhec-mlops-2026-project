@@ -15,6 +15,105 @@ current repository. Use the current repository for assessment and all future
 pushes and pull requests. Earlier GitHub PR discussions and CI run logs remain
 in the previous repository.
 
+## Step 3: Prefect training and scheduled retraining
+
+This step uses Prefect 2.20.26 with the existing Pydantic 1.x and MLflow stack.
+Dependencies are managed in `pyproject.toml` and `uv.lock`, not requirements files.
+From the repository root:
+
+```bash
+uv sync --locked --python 3.11
+```
+
+### Run the server and visualize a training run
+
+In **each terminal**, start from the repository root and set the same local configuration:
+
+```bash
+export PREFECT_HOME="$PWD/.prefect"
+export PREFECT_API_URL="http://127.0.0.1:4200/api"
+```
+
+In terminal 1, start the local server and keep it running:
+
+```bash
+uv run --no-sync prefect server start --host 127.0.0.1 --port 4200
+```
+
+In terminal 2, run training once:
+
+```bash
+uv run --no-sync python -m src.modelling.flows
+```
+
+Open http://127.0.0.1:4200. Under **Flow Runs**, open the latest `abalone-training`
+run to inspect its task graph, states and logs. There are seven task runs: data
+preparation, three candidates, selection, final refit/evaluation and persistence.
+Tasks run sequentially to avoid conflicts with MLflow's process-global tracking state.
+Missing or invalid data fails preparation without writing a model or results.
+
+The flow keeps Step 2's seed, splits, preprocessing and validation-MAE selection.
+It writes the full fitted pipeline to `src/web_service/local_objects/abalone_model.pkl`
+and metrics to `artifacts/step3_results.json`. These outputs are replaced on each
+successful run. MLflow runs use the `abalone_step3` experiment in `mlruns/`; use the
+MLflow UI command in Step 1 to inspect metrics and provenance. Prefect's local
+database and settings are in `.prefect/`, excluded from Git.
+
+The flow accepts an optional CSV argument plus `--model-path`, `--tracking-dir`,
+`--results-path` and `--experiment-name`. Relative paths are resolved against the
+project root, not the process working directory. The Step 2 training and prediction
+commands remain available.
+
+### Serve scheduled retraining
+
+After the one-off run finishes, use terminal 2 to register and serve the deployment:
+
+```bash
+uv run --no-sync python -m src.modelling.deploy
+```
+
+This creates `abalone-training/daily-retraining`, scheduled daily at **02:00 UTC**
+(`0 2 * * *`). Keep both the server and serving process running; this local setup
+needs no separate worker or work pool. Open **Deployments** in the Prefect UI to
+inspect the active schedule and run history.
+
+In terminal 3, trigger a run now and wait for completion:
+
+```bash
+uv run --no-sync prefect deployment run 'abalone-training/daily-retraining' --watch
+```
+
+The runner executes at most one run at a time. Use only one serving process for
+these output paths, and do not run one-off training concurrently: the limit is
+local to this runner, not a lock shared across processes.
+
+To change the UTC schedule, stop the serving process and restart it, for example:
+
+```bash
+uv run --no-sync python -m src.modelling.deploy --cron '0 6 * * 1'
+```
+
+This example retrains on Mondays at 06:00 UTC. Deployment options also include
+`--csv-path`, `--model-path`, `--tracking-dir`, `--results-path` and `--experiment-name`.
+Use `--help` on either module to see its options.
+
+Stop the serving process with **Ctrl+C first**; graceful shutdown pauses its schedule.
+Then stop the server with Ctrl+C. Restarting the serving command reactivates the
+schedule. If the serving process is killed or the machine sleeps, runs cannot
+execute; check for queued runs in the UI before restarting.
+
+### Check the code
+
+```bash
+uv run --no-sync python -m unittest discover -s tests -v
+uv run --no-sync pre-commit run --all-files
+```
+
+Tests cover the plain training stages, real Prefect flow/task states, invalid-input
+failures, path resolution and deployment configuration. They use synthetic data,
+temporary output directories and an isolated Prefect test database; no running
+server or personal Prefect profile is required. GitHub Actions runs the same suite.
+
 ## Step 2: Train and predict from Python modules
 
 The dataset is included at `data/abalone.csv`. From the repository root:
@@ -100,7 +199,7 @@ uv run pre-commit run --all-files
 `uv sync` installs application and development dependencies into `.venv`.
 Pydantic is an application dependency; Ruff and pre-commit are development tools.
 Pydantic 1.x is selected for compatibility with the course's older library stack.
-Dependencies for modelling, orchestration and the API will be added in their steps.
+Modelling and orchestration dependencies are included; API dependencies come in Step 4.
 
 Pre-commit runs before each commit. GitHub Actions runs the same checks on pushes
 and pull requests, using the committed `uv.lock` for reproducibility.
@@ -316,12 +415,12 @@ Your project will be evaluated on:
 When you're done, your repository should contain:
 
 ✅ **Automated Training Pipeline**
-- [ ] Prefect workflows for model training
-- [ ] Separate modules for training and inference
-- [ ] Reproducible model and encoder generation
+- [x] Prefect workflows for model training
+- [x] Separate modules for training and inference
+- [x] Reproducible model and encoder generation
 
 ✅ **Automated Deployment**
-- [ ] Prefect deployment for regular retraining
+- [x] Prefect deployment for regular retraining
 
 ✅ **Production API**
 - [ ] Working REST API for predictions
@@ -329,9 +428,9 @@ When you're done, your repository should contain:
 - [ ] Docker containerization
 
 ✅ **Professional Documentation**
-- [ ] Updated README with team info
-- [ ] Clear setup and run instructions
-- [ ] All TODOs removed from code
+- [x] Updated README with team info
+- [x] Clear setup and run instructions
+- [x] All TODOs removed from code
 
 ---
 
