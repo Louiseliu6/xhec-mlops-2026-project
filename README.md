@@ -1,143 +1,164 @@
-# MLOPS_ARTEFACT_project
+# Abalone ring-count prediction — Group 4
 
-Project for the mlops course with Artefact
+MLOps course project with Artefact: reproducible training and inference, MLflow
+tracking and scheduled Prefect retraining. The target is ring count, not age in years.
 
-## Repositories
+**Contributors:** Yunxian LIU ([@louiseliu6](https://github.com/louiseliu6)),
+Felix Meyer ([@felixmeyer6](https://github.com/felixmeyer6)),
+Lucien Descazeaud ([@luciendescazeaud](https://github.com/luciendescazeaud)),
+Anatole Jacquin de Margerie ([@Anatole-JDM](https://github.com/Anatole-JDM)).
 
-Current team repository (official course fork):
-https://github.com/Louiseliu6/xhec-mlops-2026-project
+| Exercise branch | Status |
+| --- | --- |
+| `0/environment_setup` | Complete |
+| `1/eda_and_modelling_notebooks` | Complete |
+| `2/from_notebooks_to_modules` | Complete |
+| `3/use_prefect` | Implemented |
+| `4/deploy_model_api` | Next |
 
-Previous repository (earlier pull request discussions, reviews, and CI records):
-https://github.com/Anatole-JDM/MLOPS_ARTEFACT_project
+## Setup
 
-The code, exercise branches, and Git commit history were transferred to the
-current repository. Use the current repository for assessment and all future
-pushes and pull requests. Earlier GitHub PR discussions and CI run logs remain
-in the previous repository.
-
-## Step 2: Train and predict from Python modules
-
-The dataset is included at `data/abalone.csv`. From the repository root:
-
-```bash
-uv sync --locked --python 3.11
-uv run python -m src.modelling.main data/abalone.csv
-uv run python -m src.modelling.predicting data/abalone.csv
-```
-
-The prediction command accepts a CSV containing the eight feature columns; it also
-accepts the training CSV and ignores its `Rings` column. It prints predicted ring
-counts as JSON. `Sex` must be M, F or I, and physical measurements must be
-non-negative; missing values and zero height are handled by preprocessing.
-Training compares the same three candidates and 60/20/20 split as the Step 1
-notebook, choosing by validation MAE before one held-out test evaluation.
-MLflow runs are stored in `mlruns/`. The saved `.pkl` is the **whole fitted pipeline**
-(height cleaning, imputation, encoding, scaling and regressor), ready for the API:
-`src/web_service/local_objects/abalone_model.pkl`. Results are in
-`artifacts/step2_results.json`. These generated files are excluded from Git.
-
-Each MLflow run records estimator hyperparameters, the dataset hash, split seed,
-Git revision and working-tree status. Git metadata is marked `unknown` when
-running outside a Git checkout. In the MLflow UI described below, select
-`abalone_step2` to inspect these runs.
-
-To run the regression tests (which use synthetic data) and code checks:
-
-```bash
-uv run python -m unittest discover -s tests
-uv run ruff check .
-uv run ruff format --check .
-```
-
-## Step 1: Data exploration and modelling
-
-The Abalone dataset is included at `data/abalone.csv`.
-Source: https://www.kaggle.com/datasets/rodolfomendes/abalone-dataset.
-The expected columns are Sex, Length, Diameter, Height, Whole weight, Shucked weight,
-Viscera weight, Shell weight, and Rings. The target is ring count, not years.
+Use Python 3.11 and uv 0.12.20. All commands below assume the repository root.
 
 ```bash
 uv sync --locked --python 3.11
+uv run --no-sync pre-commit install
 ```
 
-In VS Code open `notebooks/eda.ipynb`, then `notebooks/modelling.ipynb`.
-Choose `.venv/bin/python` as the notebook kernel and use Run All.
-Alternatively, execute from the project root:
+Dependencies are defined in `pyproject.toml` and locked in `uv.lock`. Prefect 2.x
+is used for compatibility with the existing Pydantic 1.x and MLflow stack.
+The [Abalone dataset](https://www.kaggle.com/datasets/rodolfomendes/abalone-dataset)
+is included at `data/abalone.csv`; no download is needed.
+
+## Train and predict
 
 ```bash
-uv run jupyter nbconvert --to notebook --execute --inplace notebooks/eda.ipynb
-uv run jupyter nbconvert --to notebook --execute --inplace notebooks/modelling.ipynb
+uv run --no-sync python -m src.modelling.main data/abalone.csv
+uv run --no-sync python -m src.modelling.predicting data/abalone.csv
 ```
 
-The fixed seed is 42, with approximately 60/20/20 train/validation/test splits.
-Preprocessing is fitted inside each model pipeline. Choose by validation MAE,
-then evaluate the selected model once on held-out test data. Candidates are a
-training-mean baseline, linear regression and a fixed random forest.
-The notebooks compare ring-count MAE, RMSE and R-squared.
+Prediction accepts the eight feature columns, ignores `Rings` if present and prints
+JSON ring-count predictions. `Sex` must be M, F or I; measurements must be non-negative.
+Missing values and zero height are handled by preprocessing.
 
-Experiments are local in `mlruns`; the selected pipeline and metrics are in
-`artifacts`. Both generated directories are excluded from Git; the CSV is tracked.
-To see this project's experiments, run from the project root:
+Plain and Prefect training use seed 42 and 60/20/20 train/validation/test splits.
+Candidates are a training-mean baseline, linear regression and a fixed random forest.
+Preprocessing is fitted inside each pipeline; selection uses validation MAE before
+refitting on train + validation and evaluating once on the held-out test set.
+
+Both training entry points save the **full fitted pipeline** (preprocessing and regressor)
+to `src/web_service/local_objects/abalone_model.pkl`, replacing the previous model:
+
+| Training entry point | Results | MLflow experiment |
+| --- | --- | --- |
+| `src.modelling.main` | `artifacts/step2_results.json` | `abalone_step2` |
+| `src.modelling.flows` | `artifacts/step3_results.json` | `abalone_step3` |
+
+## Prefect orchestration
+
+### Server and one-off training
+
+In **each terminal**, set the same local configuration from the repository root:
 
 ```bash
-uv run mlflow ui --backend-store-uri ./mlruns --host 127.0.0.1 --port 5003
+export PREFECT_HOME="$PWD/.prefect"
+export PREFECT_API_URL="http://127.0.0.1:4200/api"
 ```
 
-Open http://127.0.0.1:5003 and select `abalone_step1`. This project uses MLflow
-2.7.1 in its own environment; do not reuse the course tutorial's database or server.
-
-## Step 0: Development environment
-
-Use Python 3.11 and uv 0.12.20. Run these commands from the repository root:
+**Terminal 1:** start the server and leave it running.
 
 ```bash
-uv sync --locked --python 3.11
-source .venv/bin/activate
-uv run pre-commit install
-uv run pre-commit run --all-files
+uv run --no-sync prefect server start --host 127.0.0.1 --port 4200
 ```
 
-`uv sync` installs application and development dependencies into `.venv`.
-Pydantic is an application dependency; Ruff and pre-commit are development tools.
-Pydantic 1.x is selected for compatibility with the course's older library stack.
-Dependencies for modelling, orchestration and the API will be added in their steps.
-
-Pre-commit runs before each commit. GitHub Actions runs the same checks on pushes
-and pull requests, using the committed `uv.lock` for reproducibility.
-Ruff checks Python errors and import order, and checks formatting. To fix Python
-files when needed, run:
+**Terminal 2:** run training once.
 
 ```bash
-uv run ruff check --fix .
-uv run ruff format .
-uv run pre-commit run --all-files
+uv run --no-sync python -m src.modelling.flows
 ```
 
-Some hooks fix whitespace automatically. Review their edits and run the checks again.
-Whenever dependencies change, run `uv lock` (or `uv add`) and commit `uv.lock`.
-Do not commit `.venv`, credentials, or downloaded datasets.
+Open http://127.0.0.1:4200 → **Flow Runs** → the latest `abalone-training` run
+to inspect task states, the graph and logs. Prefect's local state is in `.prefect/`.
+Relative paths passed to the flow or deployment are resolved against the project root.
 
-### Contributors
+### Scheduled retraining
 
-- Yunxian LIU (GitHub: louiseliu6)
-- Felix Meyer (GitHub: felixmeyer6)
-- Lucien Descazeaud (GitHub: luciendescazeaud)
-- Anatole Jacquin de Margerie (GitHub: Anatole-JDM)
+Instead of one-off training, keep **terminal 2** serving a deployment:
 
-### Actual exercise branches
+```bash
+uv run --no-sync python -m src.modelling.deploy
+```
 
-1. `0/environment_setup`
-2. `1/eda_and_modelling_notebooks`
-3. `2/from_notebooks_to_modules`
-4. `3/use_prefect`
-5. `4/deploy_model_api`
+This registers `abalone-training/daily-retraining` for **02:00 UTC daily**
+(`0 2 * * *`). View its schedule and history under **Deployments** in the UI.
+No separate worker or work pool is needed.
 
-Read the corresponding `PR_i.md`, complete and check that step, then open a PR
-to this team's `main` branch. Merge the previous work into each subsequent branch
-before continuing. This repository uses `main`, not `master`.
-The official course instructions below describe the remaining project goals.
+**Terminal 3:** trigger a run immediately and wait for completion.
+
+```bash
+uv run --no-sync prefect deployment run 'abalone-training/daily-retraining' --watch
+```
+
+To change the schedule, stop the runner and restart with, for example,
+`--cron '0 6 * * 1'` (Mondays at 06:00 UTC). Run either Python module with `--help`
+for input and output options.
+
+**Operational notes:**
+- Keep both the server and runner running; this is a local deployment.
+- The runner allows one active run. Do not start another runner or one-off training
+  using the same output paths: the limit is not shared across processes.
+- Stop the runner with **Ctrl+C before stopping the server**. This pauses its schedule;
+  restarting the runner reactivates it. Check queued runs after sleep or interruption.
+
+## Notebooks and MLflow
+
+Explore `notebooks/eda.ipynb`, then `notebooks/modelling.ipynb`, using `.venv/bin/python`
+as the kernel, or execute them from the command line:
+
+```bash
+uv run --no-sync jupyter nbconvert --to notebook --execute --inplace notebooks/eda.ipynb
+uv run --no-sync jupyter nbconvert --to notebook --execute --inplace notebooks/modelling.ipynb
+```
+
+The modelling notebook writes outputs to `artifacts/` and uses experiment `abalone_step1`.
+All experiments are tracked locally in `mlruns/`, including metrics and provenance:
+
+```bash
+uv run --no-sync mlflow ui --backend-store-uri ./mlruns --host 127.0.0.1 --port 5003
+```
+
+Open http://127.0.0.1:5003 and select the experiment for your training entry point.
+Use this project's environment and tracking store, not the course tutorial's server.
+
+## Development checks
+
+```bash
+uv run --no-sync python -m unittest discover -s tests -v
+uv run --no-sync pre-commit run --all-files
+```
+
+Tests use synthetic data, temporary outputs and an isolated Prefect database; no
+running server is needed. Pre-commit checks Ruff linting/formatting and configuration;
+GitHub Actions runs the same checks and tests on pushes and pull requests.
+To fix Python files, use `uv run --no-sync ruff check --fix .` and
+`uv run --no-sync ruff format .`, then rerun the checks.
+
+When dependencies change, use `uv add` or `uv lock` and commit `uv.lock`.
+Generated artifacts, tracking data, `.prefect/` and `.venv/` are ignored; do not commit credentials.
+
+## Repository history
+
+Use [this official team fork](https://github.com/Louiseliu6/xhec-mlops-2026-project)
+and target `main` for PRs. Earlier PR discussions and CI records remain in the
+[previous repository](https://github.com/Anatole-JDM/MLOPS_ARTEFACT_project).
 
 ---
+
+## Original course instructions
+
+The original README follows unchanged. Where it differs, use the fork-specific
+setup and commands above. Completed exercise instruction files (`PR_i.md`) are
+removed after their checkpoints are met.
 
 <div align="center">
 
@@ -316,12 +337,12 @@ Your project will be evaluated on:
 When you're done, your repository should contain:
 
 ✅ **Automated Training Pipeline**
-- [ ] Prefect workflows for model training
-- [ ] Separate modules for training and inference
-- [ ] Reproducible model and encoder generation
+- [x] Prefect workflows for model training
+- [x] Separate modules for training and inference
+- [x] Reproducible model and encoder generation
 
 ✅ **Automated Deployment**
-- [ ] Prefect deployment for regular retraining
+- [x] Prefect deployment for regular retraining
 
 ✅ **Production API**
 - [ ] Working REST API for predictions
@@ -329,9 +350,9 @@ When you're done, your repository should contain:
 - [ ] Docker containerization
 
 ✅ **Professional Documentation**
-- [ ] Updated README with team info
-- [ ] Clear setup and run instructions
-- [ ] All TODOs removed from code
+- [x] Updated README with team info
+- [x] Clear setup and run instructions
+- [x] All TODOs removed from code
 
 ---
 
