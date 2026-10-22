@@ -2,7 +2,18 @@
 
 Project for the mlops course with Artefact
 
-Team repository: https://github.com/Anatole-JDM/MLOPS_ARTEFACT_project
+## Repositories
+
+Current team repository (official course fork):
+https://github.com/Louiseliu6/xhec-mlops-2026-project
+
+Previous repository (earlier pull request discussions, reviews, and CI records):
+https://github.com/Anatole-JDM/MLOPS_ARTEFACT_project
+
+The code, exercise branches, and Git commit history were transferred to the
+current repository. Use the current repository for assessment and all future
+pushes and pull requests. Earlier GitHub PR discussions and CI run logs remain
+in the previous repository.
 
 ## Step 1: Data exploration and modelling
 
