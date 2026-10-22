@@ -92,3 +92,6 @@ secrets/*
 /mlartifacts/
 /artifacts/
 .ruff_cache/
+
+# Include the course dataset
+!/data/abalone.csv

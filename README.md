@@ -17,9 +17,9 @@ in the previous repository.
 
 ## Step 1: Data exploration and modelling
 
-Copy the course Abalone CSV to `data/abalone.csv` (ignored by Git). The expected
-columns are Sex, Length, Diameter, Height, Whole weight, Shucked weight,
-Viscera weight, Shell weight, and Rings. The target is ring count, not years.
+The Abalone dataset is included at `data/abalone.csv`.
+Source: https://www.kaggle.com/datasets/rodolfomendes/abalone-dataset.
+The expectedcolumns are Sex, Length, Diameter, Height, Whole weight, Shucked weight, Viscera weight, Shell weight, and Rings. The target is ring count, not years.
 
 ```bash
 uv sync --locked --python 3.11
