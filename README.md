@@ -2,7 +2,7 @@
 
 Project for the mlops course with Artefact
 
-Team repository: https://github.com/Anatole-JDM/MLOPS_ARTEFACT_project
+Team repository: https://github.com/Louiseliu6/xhec-mlops-2026-project
 
 ## Step 2: Train and predict from Python modules
 
