@@ -85,3 +85,14 @@ secrets/*
 
 # Mac files
 .DS_Store
+
+# Local datasets and generated experiment/model outputs
+/data/*.csv
+/mlruns/
+/mlartifacts/
+/artifacts/
+/src/web_service/local_objects/*.pkl
+.ruff_cache/
+
+# Include the course dataset
+!/data/abalone.csv

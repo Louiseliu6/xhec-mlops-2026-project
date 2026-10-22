@@ -1,3 +1,144 @@
+# MLOPS_ARTEFACT_project
+
+Project for the mlops course with Artefact
+
+## Repositories
+
+Current team repository (official course fork):
+https://github.com/Louiseliu6/xhec-mlops-2026-project
+
+Previous repository (earlier pull request discussions, reviews, and CI records):
+https://github.com/Anatole-JDM/MLOPS_ARTEFACT_project
+
+The code, exercise branches, and Git commit history were transferred to the
+current repository. Use the current repository for assessment and all future
+pushes and pull requests. Earlier GitHub PR discussions and CI run logs remain
+in the previous repository.
+
+## Step 2: Train and predict from Python modules
+
+The dataset is included at `data/abalone.csv`. From the repository root:
+
+```bash
+uv sync --locked --python 3.11
+uv run python -m src.modelling.main data/abalone.csv
+uv run python -m src.modelling.predicting data/abalone.csv
+```
+
+The prediction command accepts a CSV containing the eight feature columns; it also
+accepts the training CSV and ignores its `Rings` column. It prints predicted ring
+counts as JSON. `Sex` must be M, F or I, and physical measurements must be
+non-negative; missing values and zero height are handled by preprocessing.
+Training compares the same three candidates and 60/20/20 split as the Step 1
+notebook, choosing by validation MAE before one held-out test evaluation.
+MLflow runs are stored in `mlruns/`. The saved `.pkl` is the **whole fitted pipeline**
+(height cleaning, imputation, encoding, scaling and regressor), ready for the API:
+`src/web_service/local_objects/abalone_model.pkl`. Results are in
+`artifacts/step2_results.json`. These generated files are excluded from Git.
+
+Each MLflow run records estimator hyperparameters, the dataset hash, split seed,
+Git revision and working-tree status. Git metadata is marked `unknown` when
+running outside a Git checkout. In the MLflow UI described below, select
+`abalone_step2` to inspect these runs.
+
+To run the regression tests (which use synthetic data) and code checks:
+
+```bash
+uv run python -m unittest discover -s tests
+uv run ruff check .
+uv run ruff format --check .
+```
+
+## Step 1: Data exploration and modelling
+
+The Abalone dataset is included at `data/abalone.csv`.
+Source: https://www.kaggle.com/datasets/rodolfomendes/abalone-dataset.
+The expected columns are Sex, Length, Diameter, Height, Whole weight, Shucked weight,
+Viscera weight, Shell weight, and Rings. The target is ring count, not years.
+
+```bash
+uv sync --locked --python 3.11
+```
+
+In VS Code open `notebooks/eda.ipynb`, then `notebooks/modelling.ipynb`.
+Choose `.venv/bin/python` as the notebook kernel and use Run All.
+Alternatively, execute from the project root:
+
+```bash
+uv run jupyter nbconvert --to notebook --execute --inplace notebooks/eda.ipynb
+uv run jupyter nbconvert --to notebook --execute --inplace notebooks/modelling.ipynb
+```
+
+The fixed seed is 42, with approximately 60/20/20 train/validation/test splits.
+Preprocessing is fitted inside each model pipeline. Choose by validation MAE,
+then evaluate the selected model once on held-out test data. Candidates are a
+training-mean baseline, linear regression and a fixed random forest.
+The notebooks compare ring-count MAE, RMSE and R-squared.
+
+Experiments are local in `mlruns`; the selected pipeline and metrics are in
+`artifacts`. Both generated directories are excluded from Git; the CSV is tracked.
+To see this project's experiments, run from the project root:
+
+```bash
+uv run mlflow ui --backend-store-uri ./mlruns --host 127.0.0.1 --port 5003
+```
+
+Open http://127.0.0.1:5003 and select `abalone_step1`. This project uses MLflow
+2.7.1 in its own environment; do not reuse the course tutorial's database or server.
+
+## Step 0: Development environment
+
+Use Python 3.11 and uv 0.12.20. Run these commands from the repository root:
+
+```bash
+uv sync --locked --python 3.11
+source .venv/bin/activate
+uv run pre-commit install
+uv run pre-commit run --all-files
+```
+
+`uv sync` installs application and development dependencies into `.venv`.
+Pydantic is an application dependency; Ruff and pre-commit are development tools.
+Pydantic 1.x is selected for compatibility with the course's older library stack.
+Dependencies for modelling, orchestration and the API will be added in their steps.
+
+Pre-commit runs before each commit. GitHub Actions runs the same checks on pushes
+and pull requests, using the committed `uv.lock` for reproducibility.
+Ruff checks Python errors and import order, and checks formatting. To fix Python
+files when needed, run:
+
+```bash
+uv run ruff check --fix .
+uv run ruff format .
+uv run pre-commit run --all-files
+```
+
+Some hooks fix whitespace automatically. Review their edits and run the checks again.
+Whenever dependencies change, run `uv lock` (or `uv add`) and commit `uv.lock`.
+Do not commit `.venv`, credentials, or downloaded datasets.
+
+### Contributors
+
+- Yunxian LIU (GitHub: louiseliu6)
+- Felix Meyer (GitHub: felixmeyer6)
+- Lucien Descazeaud (GitHub: luciendescazeaud)
+- Anatole Jacquin de Margerie (GitHub: Anatole-JDM)
+
+### Actual exercise branches
+
+1. `0/environment_setup`
+2. `1/eda_and_modelling_notebooks`
+3. `2/from_notebooks_to_modules`
+4. `3/use_prefect`
+5. `4/deploy_model_api`
+
+Read the corresponding `PR_i.md`, complete and check that step, then open a PR
+to this team's `main` branch. Merge the previous work into each subsequent branch
+before continuing. This repository uses `main`, not `master`.
+The official course instructions below describe the remaining project goals.
+
+---
+
 <div align="center">
 
 # MLOps Project: Abalone Age Prediction
@@ -17,7 +158,7 @@ Welcome to your MLOps project! In this hands-on project, you'll build a complete
 
 Traditionally, determining an abalone's age requires:
 1. Cutting the shell through the cone
-2. Staining it 
+2. Staining it
 3. Counting rings under a microscope (very time-consuming!)
 
 **Your Goal**: Use easier-to-obtain physical measurements (shell weight, diameter, etc.) to predict the age automatically.
@@ -30,31 +171,30 @@ Traditionally, determining an abalone's age requires:
 ### Prerequisites
 - GitHub account
 - [Kaggle account](https://www.kaggle.com/account/login?phase=startRegisterTab&returnUrl=%2F) (for dataset download)
-- Python 3.10 or 3.11
+- Python 3.11
 
 ### Setup Steps
 
-1. **Fork this repository** 
+1. **Fork this repository**
    - ⚠️ **Important**: Uncheck "Copy the `main` branch only" to get all project branches
-   
+
 2. **Add your team members** as admins to your forked repository
 
 3. **Set up your development environment**:
    ```bash
    # Create and activate a virtual environment
-   uv sync 
-   source venv/bin/activate # on Windows: venv\Scripts\activate
+   uv sync
+   source .venv/bin/activate # on Windows: .venv\Scripts\activate
 
    # Install pre-commit hooks for code quality
-    uv pip install pre-commit
-    uv run pre-commit install
+   uv run pre-commit install
    ```
 
 ## 📋 What You'll Build
 
 By the end of this project, you'll have created:
 
-### 🤖 **Automated ML Pipeline** 
+### 🤖 **Automated ML Pipeline**
 - Training workflows using Prefect
 - Automatic model retraining on schedule
 - Reproducible model and data processing
@@ -67,7 +207,7 @@ By the end of this project, you'll have created:
 ### 📊 **Production-Ready Code**
 - Clean, well-documented code
 - Automated testing and formatting
-- Proper error handling 
+- Proper error handling
 
 ## 📝 How to Work on This Project
 
@@ -102,7 +242,7 @@ git push
 
 Then:
 1. 📖 Read the PR_i.md file carefully
-2. 💻 Complete all the TODOs in the code  
+2. 💻 Complete all the TODOs in the code
 3. 🔧 Test your changes
 4. 📤 Open **ONE** pull request to your main branch
 5. ✅ Merge the pull request
@@ -147,16 +287,16 @@ uv sync
 
 Your project will be evaluated on:
 
-### 🔍 **Code Quality** 
+### 🔍 **Code Quality**
 - Clean, readable code structure
-- Proper naming conventions  
+- Proper naming conventions
 - Good use of docstrings and type hints
 
 ### 🎨 **Code Formatting**
 - Consistent style (automated with pre-commit)
 - Professional presentation
 
-### ⚙️ **Functionality** 
+### ⚙️ **Functionality**
 - Code runs without errors
 - All requirements implemented correctly
 
@@ -177,10 +317,10 @@ When you're done, your repository should contain:
 
 ✅ **Automated Training Pipeline**
 - [ ] Prefect workflows for model training
-- [ ] Separate modules for training and inference  
+- [ ] Separate modules for training and inference
 - [ ] Reproducible model and encoder generation
 
-✅ **Automated Deployment**  
+✅ **Automated Deployment**
 - [ ] Prefect deployment for regular retraining
 
 ✅ **Production API**

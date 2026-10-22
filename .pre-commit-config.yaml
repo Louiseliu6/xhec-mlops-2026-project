@@ -1,0 +1,29 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-toml
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: Ruff lint
+        entry: uv run --no-sync ruff check
+        language: system
+        types_or: [python, pyi, jupyter]
+      - id: ruff-format
+        name: Ruff format
+        entry: uv run --no-sync ruff format --check
+        language: system
+        types_or: [python, pyi, jupyter]
+      - id: uv-lock-check
+        name: Check dependency lockfile
+        entry: uv lock --check
+        language: system
+        pass_filenames: false
+        always_run: true
+exclude: ^(assets/|tests/assets/|venv/|\.venv/)
