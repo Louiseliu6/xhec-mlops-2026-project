@@ -91,6 +91,7 @@ secrets/*
 /mlruns/
 /mlartifacts/
 /artifacts/
+/src/web_service/local_objects/*.pkl
 .ruff_cache/
 
 # Include the course dataset

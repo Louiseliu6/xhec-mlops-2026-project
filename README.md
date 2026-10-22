@@ -15,11 +15,46 @@ current repository. Use the current repository for assessment and all future
 pushes and pull requests. Earlier GitHub PR discussions and CI run logs remain
 in the previous repository.
 
+## Step 2: Train and predict from Python modules
+
+The dataset is included at `data/abalone.csv`. From the repository root:
+
+```bash
+uv sync --locked --python 3.11
+uv run python -m src.modelling.main data/abalone.csv
+uv run python -m src.modelling.predicting data/abalone.csv
+```
+
+The prediction command accepts a CSV containing the eight feature columns; it also
+accepts the training CSV and ignores its `Rings` column. It prints predicted ring
+counts as JSON. `Sex` must be M, F or I, and physical measurements must be
+non-negative; missing values and zero height are handled by preprocessing.
+Training compares the same three candidates and 60/20/20 split as the Step 1
+notebook, choosing by validation MAE before one held-out test evaluation.
+MLflow runs are stored in `mlruns/`. The saved `.pkl` is the **whole fitted pipeline**
+(height cleaning, imputation, encoding, scaling and regressor), ready for the API:
+`src/web_service/local_objects/abalone_model.pkl`. Results are in
+`artifacts/step2_results.json`. These generated files are excluded from Git.
+
+Each MLflow run records estimator hyperparameters, the dataset hash, split seed,
+Git revision and working-tree status. Git metadata is marked `unknown` when
+running outside a Git checkout. In the MLflow UI described below, select
+`abalone_step2` to inspect these runs.
+
+To run the regression tests (which use synthetic data) and code checks:
+
+```bash
+uv run python -m unittest discover -s tests
+uv run ruff check .
+uv run ruff format --check .
+```
+
 ## Step 1: Data exploration and modelling
 
 The Abalone dataset is included at `data/abalone.csv`.
 Source: https://www.kaggle.com/datasets/rodolfomendes/abalone-dataset.
-The expectedcolumns are Sex, Length, Diameter, Height, Whole weight, Shucked weight, Viscera weight, Shell weight, and Rings. The target is ring count, not years.
+The expected columns are Sex, Length, Diameter, Height, Whole weight, Shucked weight,
+Viscera weight, Shell weight, and Rings. The target is ring count, not years.
 
 ```bash
 uv sync --locked --python 3.11
@@ -41,7 +76,7 @@ training-mean baseline, linear regression and a fixed random forest.
 The notebooks compare ring-count MAE, RMSE and R-squared.
 
 Experiments are local in `mlruns`; the selected pipeline and metrics are in
-`artifacts`. Both directories and the CSV are excluded from Git.
+`artifacts`. Both generated directories are excluded from Git; the CSV is tracked.
 To see this project's experiments, run from the project root:
 
 ```bash
@@ -85,9 +120,9 @@ Do not commit `.venv`, credentials, or downloaded datasets.
 ### Contributors
 
 - Yunxian LIU (GitHub: louiseliu6)
-- Felix Meyer (GitHub:felixmeyer6)
-- Lucien Descazeaud (GitHub:luciendescazeaud)
-- Anatole Jacquin de Margerie (GitHub:Anatole-JDM)
+- Felix Meyer (GitHub: felixmeyer6)
+- Lucien Descazeaud (GitHub: luciendescazeaud)
+- Anatole Jacquin de Margerie (GitHub: Anatole-JDM)
 
 ### Actual exercise branches
 

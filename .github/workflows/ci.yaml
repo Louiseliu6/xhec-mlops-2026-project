@@ -22,5 +22,7 @@ jobs:
         run: uv sync --locked --python 3.11
       - name: Check code and configuration
         run: uv run --no-sync pre-commit run --all-files
+      - name: Test training and inference
+        run: uv run --no-sync python -m unittest discover -s tests
       - name: Verify runtime dependency
         run: uv run --no-sync python -c "from pydantic import BaseModel; print('Pydantic import OK')"
