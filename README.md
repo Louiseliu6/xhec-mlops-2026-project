@@ -2,11 +2,22 @@
 
 Project for the mlops course with Artefact
 
-Team repository: https://github.com/Louiseliu6/xhec-mlops-2026-project
+## Repositories
+
+Current team repository (official course fork):
+https://github.com/Louiseliu6/xhec-mlops-2026-project
+
+Previous repository (earlier pull request discussions, reviews, and CI records):
+https://github.com/Anatole-JDM/MLOPS_ARTEFACT_project
+
+The code, exercise branches, and Git commit history were transferred to the
+current repository. Use the current repository for assessment and all future
+pushes and pull requests. Earlier GitHub PR discussions and CI run logs remain
+in the previous repository.
 
 ## Step 2: Train and predict from Python modules
 
-First place `abalone.csv` in `data/` as described in Step 1. From the repository root:
+The dataset is included at `data/abalone.csv`. From the repository root:
 
 ```bash
 uv sync --locked --python 3.11
@@ -23,7 +34,12 @@ MLflow runs are stored in `mlruns/`. The saved `.pkl` is the **whole fitted pipe
 `src/web_service/local_objects/abalone_model.pkl`. Results are in
 `artifacts/step2_results.json`. These generated files are excluded from Git.
 
-To check the code without downloading the dataset:
+Each MLflow run records estimator hyperparameters, the dataset hash, split seed,
+Git revision and working-tree status. Git metadata is marked `unknown` when
+running outside a Git checkout. In the MLflow UI described below, select
+`abalone_step2` to inspect these runs.
+
+To run the regression tests (which use synthetic data) and code checks:
 
 ```bash
 uv run python -m unittest discover -s tests
@@ -33,8 +49,9 @@ uv run ruff format --check .
 
 ## Step 1: Data exploration and modelling
 
-Copy the course Abalone CSV to `data/abalone.csv` (ignored by Git). The expected
-columns are Sex, Length, Diameter, Height, Whole weight, Shucked weight,
+The Abalone dataset is included at `data/abalone.csv`.
+Source: https://www.kaggle.com/datasets/rodolfomendes/abalone-dataset.
+The expected columns are Sex, Length, Diameter, Height, Whole weight, Shucked weight,
 Viscera weight, Shell weight, and Rings. The target is ring count, not years.
 
 ```bash
@@ -57,7 +74,7 @@ training-mean baseline, linear regression and a fixed random forest.
 The notebooks compare ring-count MAE, RMSE and R-squared.
 
 Experiments are local in `mlruns`; the selected pipeline and metrics are in
-`artifacts`. Both directories and the CSV are excluded from Git.
+`artifacts`. Both generated directories are excluded from Git; the CSV is tracked.
 To see this project's experiments, run from the project root:
 
 ```bash

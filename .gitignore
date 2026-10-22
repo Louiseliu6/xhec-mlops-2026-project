@@ -93,3 +93,6 @@ secrets/*
 /artifacts/
 /src/web_service/local_objects/*.pkl
 .ruff_cache/
+
+# Include the course dataset
+!/data/abalone.csv

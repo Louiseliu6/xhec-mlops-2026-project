@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 import mlflow
@@ -23,6 +24,21 @@ from src.modelling.preprocessing import (
 from src.modelling.utils import save_model
 
 SEED = 42
+
+
+def git_metadata() -> dict[str, str]:
+    """Record source provenance without requiring a Git checkout to train."""
+    root = Path(__file__).resolve().parents[2]
+    try:
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=root, text=True, stderr=subprocess.DEVNULL
+        ).strip()
+        status = subprocess.check_output(
+            ["git", "status", "--porcelain"], cwd=root, text=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return {"git_commit": "unknown", "worktree_dirty": "unknown"}
+    return {"git_commit": commit, "worktree_dirty": str(bool(status))}
 
 
 def split_data(data: pd.DataFrame) -> tuple:
@@ -63,11 +79,21 @@ def train_and_save(
     mlflow.set_tracking_uri(tracking_dir.resolve().as_uri())
     mlflow.set_experiment("abalone_step2")
 
+    provenance = git_metadata()
+    candidates = candidate_models()
     validation = {}
-    for name, estimator in candidate_models().items():
+    for name, estimator in candidates.items():
         model = make_pipeline(clone(estimator))
         with mlflow.start_run(run_name=name):
-            mlflow.log_params({"candidate": name, "split_seed": SEED, "data_sha256": data_sha256})
+            mlflow.set_tags({"phase": "validation", **provenance})
+            mlflow.log_params(
+                {
+                    "candidate": name,
+                    "split_seed": SEED,
+                    "data_sha256": data_sha256,
+                    **estimator.get_params(),
+                }
+            )
             model.fit(x_train, y_train)
             metrics = scores(y_val, model.predict(x_val))
             mlflow.log_metrics({f"val_{key}": value for key, value in metrics.items()})
@@ -75,15 +101,21 @@ def train_and_save(
 
     best_name = min(validation, key=lambda name: validation[name]["mae"])
     # Refit the chosen configuration on train + validation. Test stays untouched until now.
-    final_model = make_pipeline(clone(candidate_models()[best_name]))
+    final_model = make_pipeline(clone(candidates[best_name]))
     final_model.fit(x_trainval, y_trainval)
     test_metrics = scores(y_test, final_model.predict(x_test))
     baseline = DummyRegressor(strategy="mean").fit(x_trainval, y_trainval)
     baseline_metrics = scores(y_test, baseline.predict(x_test))
 
     with mlflow.start_run(run_name=f"final_{best_name}"):
+        mlflow.set_tags({"phase": "final_test", **provenance})
         mlflow.log_params(
-            {"selected_model": best_name, "split_seed": SEED, "data_sha256": data_sha256}
+            {
+                "selected_model": best_name,
+                "split_seed": SEED,
+                "data_sha256": data_sha256,
+                **candidates[best_name].get_params(),
+            }
         )
         mlflow.log_metrics({f"test_{key}": value for key, value in test_metrics.items()})
         mlflow.log_metrics(
