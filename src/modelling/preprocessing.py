@@ -22,6 +22,28 @@ FEATURE_COLUMNS = ["Sex", *NUMERIC_COLUMNS]
 TARGET_COLUMN = "Rings"
 
 
+def validate_features(features: pd.DataFrame) -> pd.DataFrame:
+    """Check the shared training/inference input contract before preprocessing."""
+    missing = set(FEATURE_COLUMNS) - set(features.columns)
+    if missing:
+        raise ValueError(f"Missing input columns: {sorted(missing)}")
+
+    validated = features[FEATURE_COLUMNS].copy()
+    invalid_sex = validated["Sex"].notna() & ~validated["Sex"].isin({"M", "F", "I"})
+    if invalid_sex.any():
+        raise ValueError("Sex must be M, F or I")
+
+    for column in NUMERIC_COLUMNS:
+        try:
+            validated[column] = pd.to_numeric(validated[column], errors="raise")
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"{column} must be numeric") from error
+        values = validated[column].to_numpy(dtype=float, na_value=np.nan)
+        if np.isinf(values).any() or (values < 0).any():
+            raise ValueError(f"{column} must be finite and non-negative")
+    return validated
+
+
 def read_training_data(path: Path) -> pd.DataFrame:
     """Load the course CSV and reject an unexpected schema or invalid targets."""
     if not path.is_file():
@@ -34,9 +56,7 @@ def read_training_data(path: Path) -> pd.DataFrame:
         raise ValueError("The Abalone CSV is empty")
     if not data[TARGET_COLUMN].notna().all() or not data[TARGET_COLUMN].gt(0).all():
         raise ValueError("Rings must be present and positive")
-    if not set(data["Sex"].dropna().unique()).issubset({"M", "F", "I"}):
-        raise ValueError("Sex must be M, F or I")
-    data[NUMERIC_COLUMNS] = data[NUMERIC_COLUMNS].apply(pd.to_numeric, errors="raise")
+    data[FEATURE_COLUMNS] = validate_features(data)
     return data
 
 

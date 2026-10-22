@@ -8,15 +8,12 @@ import numpy as np
 import pandas as pd
 from sklearn.pipeline import Pipeline
 
-from src.modelling.preprocessing import FEATURE_COLUMNS
+from src.modelling.preprocessing import validate_features
 from src.modelling.utils import load_model
 
 
 def predict(model: Pipeline, features: pd.DataFrame) -> np.ndarray:
-    missing = set(FEATURE_COLUMNS) - set(features.columns)
-    if missing:
-        raise ValueError(f"Missing input columns: {sorted(missing)}")
-    return model.predict(features[FEATURE_COLUMNS])
+    return model.predict(validate_features(features))
 
 
 def main() -> None:

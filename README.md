@@ -27,8 +27,10 @@ uv run python -m src.modelling.predicting data/abalone.csv
 
 The prediction command accepts a CSV containing the eight feature columns; it also
 accepts the training CSV and ignores its `Rings` column. It prints predicted ring
-counts as JSON. Training compares the same three candidates and 60/20/20 split as
-the Step 1 notebook, choosing by validation MAE before one held-out test evaluation.
+counts as JSON. `Sex` must be M, F or I, and physical measurements must be
+non-negative; missing values and zero height are handled by preprocessing.
+Training compares the same three candidates and 60/20/20 split as the Step 1
+notebook, choosing by validation MAE before one held-out test evaluation.
 MLflow runs are stored in `mlruns/`. The saved `.pkl` is the **whole fitted pipeline**
 (height cleaning, imputation, encoding, scaling and regressor), ready for the API:
 `src/web_service/local_objects/abalone_model.pkl`. Results are in

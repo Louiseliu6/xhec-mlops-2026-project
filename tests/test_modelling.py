@@ -9,9 +9,10 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 from mlflow.tracking import MlflowClient
+from sklearn.base import clone
 
 from src.modelling.predicting import predict
-from src.modelling.preprocessing import FEATURE_COLUMNS, read_training_data
+from src.modelling.preprocessing import FEATURE_COLUMNS, make_pipeline, read_training_data
 from src.modelling.training import candidate_models, git_metadata, split_data, train_and_save
 from src.modelling.utils import load_model, save_model
 
@@ -72,9 +73,14 @@ class ModellingTest(unittest.TestCase):
                 result["validation"], key=lambda name: result["validation"][name]["mae"]
             )
             self.assertEqual(result["selected_model"], best_name)
+            # This fixed data favors linear regression on validation, but not on test.
+            self.assertEqual(best_name, "linear_regression")
             self.assertEqual(
                 result["selected_validation_mae"], result["validation"][best_name]["mae"]
             )
+            expected_final = make_pipeline(clone(candidate_models()[best_name]))
+            expected_final.fit(x_trainval, targets[2])
+            np.testing.assert_allclose(model.predict(x_test), expected_final.predict(x_test))
             self.assertTrue((root / "results.json").is_file())
 
             client = MlflowClient(tracking_uri=(root / "mlruns").as_uri())
@@ -91,6 +97,20 @@ class ModellingTest(unittest.TestCase):
                     self.assertEqual(run.data.params[key], str(value))
             with self.assertRaisesRegex(ValueError, "Missing input columns"):
                 predict(model, data[["Sex"]].head(1))
+
+            invalid = features.copy()
+            invalid.loc[0, "Sex"] = "X"
+            with self.assertRaisesRegex(ValueError, "Sex must be M, F or I"):
+                predict(model, invalid)
+            invalid = features.copy()
+            invalid.loc[0, "Length"] = -1
+            with self.assertRaisesRegex(ValueError, "Length must be finite and non-negative"):
+                predict(model, invalid)
+            invalid_training = data.copy()
+            invalid_training.loc[0, "Length"] = -1
+            invalid_training.to_csv(root / "invalid.csv", index=False)
+            with self.assertRaisesRegex(ValueError, "Length must be finite and non-negative"):
+                read_training_data(root / "invalid.csv")
 
     def test_git_metadata_without_git(self) -> None:
         for error in (FileNotFoundError(), subprocess.CalledProcessError(128, "git")):
