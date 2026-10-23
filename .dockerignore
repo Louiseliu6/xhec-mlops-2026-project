@@ -1,0 +1,11 @@
+.git
+.venv
+.prefect
+.ruff_cache
+**/__pycache__
+artifacts
+mlruns
+mlartifacts
+notebooks
+tests
+src/web_service/local_objects/*.pkl

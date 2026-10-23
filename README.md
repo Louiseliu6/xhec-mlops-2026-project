@@ -1,7 +1,8 @@
 # Abalone ring-count prediction — Group 4
 
 MLOps course project with Artefact: reproducible training and inference, MLflow
-tracking and scheduled Prefect retraining. The target is ring count, not age in years.
+tracking, scheduled Prefect retraining and a Dockerized FastAPI prediction service.
+The target is ring count, not age in years.
 
 **Contributors:** Yunxian LIU ([@louiseliu6](https://github.com/louiseliu6)),
 Felix Meyer ([@felixmeyer6](https://github.com/felixmeyer6)),
@@ -14,7 +15,7 @@ Anatole Jacquin de Margerie ([@Anatole-JDM](https://github.com/Anatole-JDM)).
 | `1/eda_and_modelling_notebooks` | Complete |
 | `2/from_notebooks_to_modules` | Complete |
 | `3/use_prefect` | Implemented |
-| `4/deploy_model_api` | Next |
+| `4/deploy_model_api` | Implemented |
 
 ## Setup
 
@@ -110,6 +111,66 @@ for input and output options.
 - Stop the runner with **Ctrl+C before stopping the server**. This pauses its schedule;
   restarting the runner reactivates it. Check queued runs after sleep or interruption.
 
+## Prediction API
+
+The FastAPI service in `src/web_service/` loads the trained pipeline once at startup
+and validates each request with Pydantic before predicting.
+
+### Run with Docker
+
+Start Docker Desktop (or another Docker engine), then build and run the image:
+
+```bash
+docker build -f Dockerfile.app -t abalone-api .
+docker run --rm --name abalone-api -p 0.0.0.0:8000:8001 -p 0.0.0.0:4200:4201 abalone-api
+```
+
+The build installs the locked runtime dependencies and trains the model, so no local
+`.pkl` is needed; rebuild after code or data changes. `bin/run_services.sh` starts the
+API on container port 8001 and a Prefect server on 4201, published on the host as:
+
+| Service | URL |
+| --- | --- |
+| API docs (try `/predict` in the browser) | http://localhost:8000/docs |
+| Prefect UI | http://localhost:4200 |
+
+Keep these host ports: the containerized Prefect UI calls its API at `localhost:4200`.
+Stop any local Prefect server first, since it uses the same port. Stop the container
+with **Ctrl+C**. To record a training run in the container's Prefect server:
+
+```bash
+docker exec abalone-api python -m src.modelling.flows
+```
+
+The running API keeps the model loaded at startup; rebuild the image to serve a new one.
+
+### Run locally
+
+After training (see [Train and predict](#train-and-predict)):
+
+```bash
+uv run --no-sync uvicorn src.web_service.main:app --host 127.0.0.1 --port 8001
+```
+
+Open http://127.0.0.1:8001/docs. Set `MODEL_PATH` to serve a different pipeline file.
+
+### Requests
+
+`GET /` is a health check. `POST /predict` takes one abalone with the CSV column names
+and returns its predicted ring count (age in years is roughly rings + 1.5):
+
+```bash
+curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" \
+  -d '{"Sex": "M", "Length": 0.455, "Diameter": 0.365, "Height": 0.095,
+       "Whole weight": 0.514, "Shucked weight": 0.2245, "Viscera weight": 0.101,
+       "Shell weight": 0.15}'
+# {"rings": 10.62...}  (HTTP 201)
+```
+
+All eight fields are required; `Sex` must be M, F or I and measurements non-negative.
+Invalid requests return HTTP 422 naming the offending field. On Windows, run `curl`
+from Git Bash or use the `/docs` page instead.
+
 ## Notebooks and MLflow
 
 Explore `notebooks/eda.ipynb`, then `notebooks/modelling.ipynb`, using `.venv/bin/python`
@@ -138,7 +199,7 @@ uv run --no-sync pre-commit run --all-files
 ```
 
 Tests use synthetic data, temporary outputs and an isolated Prefect database; no
-running server is needed. Pre-commit checks Ruff linting/formatting and configuration;
+running server or Docker is needed. Pre-commit checks Ruff linting/formatting and configuration;
 GitHub Actions runs the same checks and tests on pushes and pull requests.
 To fix Python files, use `uv run --no-sync ruff check --fix .` and
 `uv run --no-sync ruff format .`, then rerun the checks.
@@ -345,9 +406,9 @@ When you're done, your repository should contain:
 - [x] Prefect deployment for regular retraining
 
 ✅ **Production API**
-- [ ] Working REST API for predictions
-- [ ] Pydantic input validation
-- [ ] Docker containerization
+- [x] Working REST API for predictions
+- [x] Pydantic input validation
+- [x] Docker containerization
 
 ✅ **Professional Documentation**
 - [x] Updated README with team info

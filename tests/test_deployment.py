@@ -44,16 +44,18 @@ class DeploymentTest(unittest.TestCase):
                 self.assertTrue(Path(parameters[key]).is_absolute())
 
     def test_custom_schedule_and_parameters(self) -> None:
+        # Resolve so the expected absolute paths also carry a drive letter on Windows.
+        custom = Path("/custom").resolve()
         with (
             temporary_settings({PREFECT_API_URL: "http://127.0.0.1:4200/api"}),
             patch.object(training_flow, "serve") as serve,
         ):
             serve_training(
                 cron="0 6 * * 1",
-                csv_path=Path("/custom/data.csv"),
-                model_path=Path("/custom/model.pkl"),
-                tracking_dir=Path("/custom/mlruns"),
-                results_path=Path("/custom/results.json"),
+                csv_path=custom / "data.csv",
+                model_path=custom / "model.pkl",
+                tracking_dir=custom / "mlruns",
+                results_path=custom / "results.json",
                 experiment_name="custom-experiment",
             )
         options = serve.call_args.kwargs
@@ -62,10 +64,10 @@ class DeploymentTest(unittest.TestCase):
         self.assertEqual(
             options["parameters"],
             {
-                "csv_path": "/custom/data.csv",
-                "model_path": "/custom/model.pkl",
-                "tracking_dir": "/custom/mlruns",
-                "results_path": "/custom/results.json",
+                "csv_path": str(custom / "data.csv"),
+                "model_path": str(custom / "model.pkl"),
+                "tracking_dir": str(custom / "mlruns"),
+                "results_path": str(custom / "results.json"),
                 "experiment_name": "custom-experiment",
             },
         )
