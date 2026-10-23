@@ -89,6 +89,7 @@ secrets/*
 # Local datasets and generated experiment/model outputs
 /data/*.csv
 /mlruns/
+/.prefect/
 /mlartifacts/
 /artifacts/
 /src/web_service/local_objects/*.pkl
