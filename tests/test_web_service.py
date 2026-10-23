@@ -1,5 +1,6 @@
 """API checks against a small pipeline trained on synthetic data."""
 
+import json
 import os
 import tempfile
 import unittest
@@ -70,6 +71,17 @@ class WebServiceTest(unittest.TestCase):
         for payload in invalid_payloads:
             with self.subTest(payload=payload):
                 self.assertEqual(self.client.post("/predict", json=payload).status_code, 422)
+
+    def test_predict_rejects_overflowing_numbers(self) -> None:
+        # 1e309 is valid JSON syntax but overflows a Python float to infinity.
+        for field in (key for key in PAYLOAD if key != "Sex"):
+            with self.subTest(field=field):
+                payload = {**PAYLOAD, field: "overflow-placeholder"}
+                body = json.dumps(payload).replace('"overflow-placeholder"', "1e309")
+                response = self.client.post(
+                    "/predict", content=body, headers={"Content-Type": "application/json"}
+                )
+                self.assertEqual(response.status_code, 422)
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ class AbaloneFeatures(BaseModel):
 
     class Config:
         allow_population_by_field_name = True
+        allow_inf_nan = False
         schema_extra = {
             "example": {
                 "Sex": "M",
