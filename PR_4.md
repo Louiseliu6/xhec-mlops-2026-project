@@ -12,7 +12,7 @@ The goal of this PR is to:
 - [ ] Create a FastAPI API to make predictions on new data
 - [ ] Dockerize the API
 
-Files to be modified: 
+Files to be modified:
 - [ ] the `src/web_service` folder
 - [ ] the `bin/run_services.sh` file
 - [ ] `Dockerfile.app`
